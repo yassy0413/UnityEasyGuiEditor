@@ -1,6 +1,8 @@
 Unity Easy Gui Editor
 ===
 
+Easier creation of hierarchical debug menus
+
 About Unity Easy Gui Editor
 ---
 Unity Easy Gui Editor makes menu creation in GUILayout very easy.
