@@ -11,6 +11,8 @@ namespace UnityEasyGuiEditor
     {
         public static GuiEditor Instance { get; private set; }
 
+        private const int HeaderIconHeight = 24;
+
         [SerializeField]
         private int m_Resolution = 360;
 
@@ -46,6 +48,9 @@ namespace UnityEasyGuiEditor
 
         [SerializeField]
         private Texture2D m_CloseButtonTexture;
+
+        [SerializeField]
+        private Texture2D m_FilterButtonTexture;
 
         private Entry m_EntryRoot;
         private Entry m_EntryCurrent;
@@ -232,6 +237,14 @@ namespace UnityEasyGuiEditor
             return entry;
         }
 
+        private static bool HeaderButton(GUIContentWithSize content, Texture2D texture2D)
+        {
+            return texture2D == null
+                ? GUILayout.Button(content.GUIContent, content.Width)
+                : GUILayout.Button(texture2D,
+                    GUILayout.Width(HeaderIconHeight), GUILayout.Height(HeaderIconHeight));
+        }
+
         private void DrawDirectory(Entry entry)
         {
             var entryCount = entry.Entries.Count;
@@ -286,7 +299,15 @@ namespace UnityEasyGuiEditor
         {
             using var _ = new GUILayout.HorizontalScope(GUI.skin.box);
 
-            GUILayout.Label(m_FilterGuiContent.GUIContent, m_FilterGuiContent.Width);
+            if (m_FilterButtonTexture == null)
+            {
+                GUILayout.Label(m_FilterGuiContent.GUIContent, m_FilterGuiContent.Width);
+            }
+            else
+            {
+                GUILayout.Label(m_FilterButtonTexture,
+                    GUILayout.Width(HeaderIconHeight), GUILayout.Height(HeaderIconHeight));
+            }
 
             var filter = GUILayout.TextArea(m_Filter);
             if (filter != m_Filter)
@@ -340,13 +361,6 @@ namespace UnityEasyGuiEditor
                     enabled = true;
                 }
             }
-        }
-
-        private static bool HeaderButton(GUIContentWithSize content, Texture2D texture2D)
-        {
-            return texture2D == null
-                ? GUILayout.Button(content.GUIContent, content.Width)
-                : GUILayout.Button(texture2D, GUILayout.ExpandWidth(false));
         }
 
         private void DrawBreadcrumb()
@@ -415,7 +429,7 @@ namespace UnityEasyGuiEditor
 
         public void EnsureGuiContents()
         {
-            m_FilterGuiContent ??= new GUIContentWithSize("Filter:");
+            m_FilterGuiContent ??= new GUIContentWithSize("Filter:", GUI.skin.button);
             m_GreaterGuiContent ??= new GUIContentWithSize(">");
             m_BackGuiContent ??= new GUIContentWithSize("Back", GUI.skin.button);
             m_HomeGuiContent ??= new GUIContentWithSize("Home", GUI.skin.button);
