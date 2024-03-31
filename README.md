@@ -22,10 +22,10 @@ Usage
 ```
 using UnityEasyGuiEditor;
 
-GuiEditor.AddEntry("PATH/TO/USE", entry =>
+GuiEditor.OnGui += "PATH/TO/USE", entry =>
 {
     // OnGUI
-});
+};
 
 ````
 

@@ -161,7 +161,7 @@ namespace UnityEasyGuiEditor
 
         private void AddCanvasSample()
         {
-            GuiCanvas.Add(rc =>
+            GuiCanvas.OnGui += rc =>
             {
                 var width = 220;
                 var rect = new Rect(20, 100, width, 60);
@@ -169,7 +169,7 @@ namespace UnityEasyGuiEditor
                 using var _vs = new GUILayout.VerticalScope();
                 GUILayout.Label(DateTimeOffset.UtcNow.ToString());
                 GUILayout.Label(DateTimeOffset.UtcNow.ToLocalTime().ToString());
-            });
+            };
         }
     }
 }
