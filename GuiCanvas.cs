@@ -15,7 +15,18 @@ namespace UnityEasyGuiEditor
         private float m_MatchHeight;
 
         [SerializeField]
+        private bool m_DontDestroyOnLoad;
+
+        [SerializeField]
         private bool m_ApplySafeArea = true;
+
+        private void Awake()
+        {
+            if (m_DontDestroyOnLoad)
+            {
+                DontDestroyOnLoad(this);
+            }
+        }
 
         private void OnGUI()
         {

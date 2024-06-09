@@ -23,6 +23,9 @@ namespace UnityEasyGuiEditor
         private float m_MatchHeight;
 
         [SerializeField]
+        private bool m_DontDestroyOnLoad;
+
+        [SerializeField]
         private bool m_ApplySafeArea = true;
 
         [SerializeField]
@@ -144,6 +147,11 @@ namespace UnityEasyGuiEditor
                     GUI.DragWindow();
                 }
             };
+
+            if (m_DontDestroyOnLoad)
+            {
+                DontDestroyOnLoad(this);
+            }
         }
 
         private void OnDestroy()
