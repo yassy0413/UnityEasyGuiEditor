@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using System.IO;
 using System.Linq;
@@ -9,14 +11,14 @@ namespace UnityEasyGuiEditor
     [DisallowMultipleComponent]
     public class GuiEditor : MonoBehaviour, IDisposable
     {
-        public static GuiEditor Instance { get; private set; }
+        public static GuiEditor? Instance { get; private set; }
 
         private const int HeaderIconHeight = 24;
 
         [SerializeField]
         private int m_Resolution = 360;
 
-        [SerializeField]
+        [SerializeField, Range(1, 8)]
         private int m_GroupSelectionXCount = 2;
 
         [SerializeField, Range(0, 1)]
@@ -44,53 +46,59 @@ namespace UnityEasyGuiEditor
         private Color m_Color = Color.white;
 
         [SerializeField]
-        private Texture2D m_BackButtonTexture;
+        private Texture2D? m_BackButtonTexture;
 
         [SerializeField]
-        private Texture2D m_HomeButtonTexture;
+        private Texture2D? m_HomeButtonTexture;
 
         [SerializeField]
-        private Texture2D m_CloseButtonTexture;
+        private Texture2D? m_CloseButtonTexture;
 
         [SerializeField]
-        private Texture2D m_FilterButtonTexture;
+        private Texture2D? m_FilterButtonTexture;
 
-        private Entry m_EntryRoot;
-        private Entry m_EntryCurrent;
-        private Entry m_EntryNext;
+        private Entry? m_EntryRoot;
+        private Entry? m_EntryNext;
         private Vector2 m_ScrollPosition;
         private Vector2 m_BreadcrumbScrollPosition;
-        private string m_Filter;
+        private string m_Filter = string.Empty;
         private bool m_FilterUpdated;
-        private Entry[] m_FilteredEntries;
-        private GUI.WindowFunction m_WindowFunction;
+        private Entry[] m_FilteredEntries = Array.Empty<Entry>();
+        private GUI.WindowFunction m_WindowFunction = _ => { };
 
-        private GUIContentWithSize m_FilterGuiContent;
-        private GUIContentWithSize m_GreaterGuiContent;
-        private GUIContentWithSize m_BackGuiContent;
-        private GUIContentWithSize m_HomeGuiContent;
-        private GUIContentWithSize m_CloseGuiContent;
-        private GUIContentWithSize m_OpenGuiContent;
+        private GUIContentWithSize? m_FilterGuiContent;
+        private GUIContentWithSize? m_GreaterGuiContent;
+        private GUIContentWithSize? m_BackGuiContent;
+        private GUIContentWithSize? m_HomeGuiContent;
+        private GUIContentWithSize? m_CloseGuiContent;
+        private GUIContentWithSize? m_OpenGuiContent;
 
-        public Entry CurrentEntry => m_EntryCurrent;
+        public Entry? CurrentEntry { get; private set; }
 
         public sealed class Entry
         {
-            public string Name { get; set; }
-            public Entry Parent { get; set; }
+            public string Name { get; set; } = string.Empty;
+            public Entry? Parent { get; set; }
             public List<Entry> Entries { get; set; } = new();
-            public Action OnGUI { get; set; }
+            public Action OnGUI { get; set; } = () => { };
 
-            private GUIContentWithSize m_NameLabelGuiContent;
+            private GUIContentWithSize? m_NameLabelGuiContent;
+
             public GUIContentWithSize NameLabelGUIContent =>
                 m_NameLabelGuiContent ??= new GUIContentWithSize(Name, GUI.skin.label);
 
-            private GUIContentWithSize m_NameButtonGuiContent;
+            private GUIContentWithSize? m_NameButtonGuiContent;
+
             public GUIContentWithSize NameButtonGUIContent =>
                 m_NameButtonGuiContent ??= new GUIContentWithSize(Name, GUI.skin.button);
 
             public void Add(string name, Action<Entry> onGui)
             {
+                if (Instance == null)
+                {
+                    return;
+                }
+
                 Entries.Add(Instance.CreateEntry(name, this, onGui));
             }
 
@@ -101,16 +109,18 @@ namespace UnityEasyGuiEditor
                 {
                     result.Add(entry);
                 }
+
                 result.Reverse();
                 return result;
             }
 
             public void BuildFilteredList(List<Entry> entries, string filter)
             {
-                if (Name.ToLower().Contains(filter))
+                if (Name.ToLowerInvariant().Contains(filter))
                 {
                     entries.Add(this);
                 }
+
                 foreach (var entry in Entries)
                 {
                     entry.BuildFilteredList(entries, filter);
@@ -123,7 +133,7 @@ namespace UnityEasyGuiEditor
             public GUIContent GUIContent { get; }
             public GUILayoutOption Width { get; }
 
-            public GUIContentWithSize(string value, GUIStyle style = null)
+            public GUIContentWithSize(string value, GUIStyle? style = null)
             {
                 style ??= GUI.skin.label;
                 GUIContent = new GUIContent(value);
@@ -136,11 +146,11 @@ namespace UnityEasyGuiEditor
             Instance = this;
 
             m_EntryRoot = CreateRootEntry(m_RootName, null);
-            m_EntryCurrent = m_EntryRoot;
+            CurrentEntry = m_EntryRoot;
 
             m_WindowFunction = _ =>
             {
-                m_EntryCurrent.OnGUI();
+                CurrentEntry.OnGUI();
 
                 if (m_DragWindow)
                 {
@@ -162,40 +172,53 @@ namespace UnityEasyGuiEditor
         public void Dispose()
         {
             m_EntryRoot = null;
-            m_EntryCurrent = null;
+            CurrentEntry = null;
             Instance = null;
         }
 
-        public Entry GetEntry(string path)
+        public Entry? GetEntry(string path)
         {
             var entry = m_EntryRoot;
-            foreach (var name in path.Split('/'))
+
+            if (entry == null)
             {
-                var v = entry.Entries.FirstOrDefault(x => x.Name == name);
+                return null;
+            }
+
+            foreach (var entryName in path.Split('/'))
+            {
+                var v = entry.Entries.FirstOrDefault(x => x.Name == entryName);
                 if (v == null)
                 {
-                    v = CreateDirectoryEntry(name, entry);
+                    v = CreateDirectoryEntry(entryName, entry);
                     entry.Entries.Add(v);
                 }
+
                 entry = v;
             }
+
             return entry;
         }
 
         public static void AddEntry(string path, Action<Entry> onGui)
         {
+            if (Instance == null)
+            {
+                return;
+            }
+
             var directory = Path.GetDirectoryName(path);
             var entry = string.IsNullOrEmpty(directory)
                 ? Instance.m_EntryRoot
                 : Instance.GetEntry(directory);
-            entry.Add(Path.GetFileName(path), onGui);
+            entry?.Add(Path.GetFileName(path), onGui);
         }
 
-        private Entry CreateEntry(string name, Entry parent, Action<Entry> onGui)
+        private Entry CreateEntry(string entryName, Entry parent, Action<Entry> onGui)
         {
             var entry = new Entry
             {
-                Name = name,
+                Name = entryName,
                 Parent = parent
             };
             entry.OnGUI = () =>
@@ -206,7 +229,7 @@ namespace UnityEasyGuiEditor
                 {
                     DrawBreadcrumb();
                 }
-                
+
                 using var scrollViewScope = new GUILayout.ScrollViewScope(m_ScrollPosition);
                 m_ScrollPosition = scrollViewScope.scrollPosition;
                 onGui(entry);
@@ -214,16 +237,16 @@ namespace UnityEasyGuiEditor
             return entry;
         }
 
-        private Entry CreateDirectoryEntry(string name, Entry parent)
+        private Entry CreateDirectoryEntry(string entryName, Entry parent)
         {
-            return CreateEntry(name, parent, DrawDirectory);
+            return CreateEntry(entryName, parent, DrawDirectory);
         }
 
-        private Entry CreateRootEntry(string name, Entry parent)
+        private Entry CreateRootEntry(string entryName, Entry? parent)
         {
             var entry = new Entry
             {
-                Name = name,
+                Name = entryName,
                 Parent = parent
             };
             entry.OnGUI = () =>
@@ -233,7 +256,7 @@ namespace UnityEasyGuiEditor
                 using var scrollViewScope = new GUILayout.ScrollViewScope(m_ScrollPosition);
                 m_ScrollPosition = scrollViewScope.scrollPosition;
 
-                if (m_FilteredEntries == null)
+                if (m_FilteredEntries.Length < 1)
                 {
                     DrawDirectory(entry);
                 }
@@ -245,8 +268,13 @@ namespace UnityEasyGuiEditor
             return entry;
         }
 
-        private static bool HeaderButton(GUIContentWithSize content, Texture2D texture2D)
+        private static bool HeaderButton(GUIContentWithSize? content, Texture2D? texture2D)
         {
+            if (content == null)
+            {
+                return false;
+            }
+
             return texture2D == null
                 ? GUILayout.Button(content.GUIContent, content.Width)
                 : GUILayout.Button(texture2D,
@@ -309,7 +337,10 @@ namespace UnityEasyGuiEditor
 
             if (m_FilterButtonTexture == null)
             {
-                GUILayout.Label(m_FilterGuiContent.GUIContent, m_FilterGuiContent.Width);
+                if (m_FilterGuiContent != null)
+                {
+                    GUILayout.Label(m_FilterGuiContent.GUIContent, m_FilterGuiContent.Width);
+                }
             }
             else
             {
@@ -331,11 +362,11 @@ namespace UnityEasyGuiEditor
         {
             using var _ = new GUILayout.HorizontalScope(GUI.skin.box);
 
-            if (m_EntryCurrent.Parent != null)
+            if (CurrentEntry?.Parent != null)
             {
                 if (HeaderButton(m_BackGuiContent, m_BackButtonTexture))
                 {
-                    m_EntryNext = m_EntryCurrent.Parent;
+                    m_EntryNext = CurrentEntry.Parent;
                 }
 
                 if (HeaderButton(m_HomeGuiContent, m_HomeButtonTexture))
@@ -344,9 +375,12 @@ namespace UnityEasyGuiEditor
                 }
             }
 
-            GUILayout.Label(
-                m_EntryCurrent.NameLabelGUIContent.GUIContent,
-                m_EntryCurrent.NameLabelGUIContent.Width);
+            if (CurrentEntry != null)
+            {
+                GUILayout.Label(
+                    CurrentEntry.NameLabelGUIContent.GUIContent,
+                    CurrentEntry.NameLabelGUIContent.Width);
+            }
 
             GUILayout.FlexibleSpace();
 
@@ -364,16 +398,19 @@ namespace UnityEasyGuiEditor
             }
             else
             {
-                if (GUILayout.Button(m_OpenGuiContent.GUIContent, m_OpenGuiContent.Width))
+                if (m_OpenGuiContent != null)
                 {
-                    enabled = true;
+                    if (GUILayout.Button(m_OpenGuiContent.GUIContent, m_OpenGuiContent.Width))
+                    {
+                        enabled = true;
+                    }
                 }
             }
         }
 
         private void DrawBreadcrumb()
         {
-            if (m_EntryCurrent.Parent == null)
+            if (CurrentEntry?.Parent == null)
             {
                 return;
             }
@@ -383,13 +420,13 @@ namespace UnityEasyGuiEditor
 
             using var _ = new GUILayout.HorizontalScope(GUI.skin.box);
 
-            var breadcrumb = m_EntryCurrent.GetBreadcrumb();
+            var breadcrumb = CurrentEntry.GetBreadcrumb();
             var breadcrumbCount = breadcrumb.Count;
 
             for (var index = 0; index < breadcrumbCount; ++index)
             {
                 var entry = breadcrumb[index];
-                
+
                 if (index + 1 < breadcrumbCount)
                 {
                     var nameGuiContent = entry.NameButtonGUIContent;
@@ -398,7 +435,10 @@ namespace UnityEasyGuiEditor
                         m_EntryNext = entry;
                     }
 
-                    GUILayout.Label(m_GreaterGuiContent.GUIContent, m_GreaterGuiContent.Width);
+                    if (m_GreaterGuiContent != null)
+                    {
+                        GUILayout.Label(m_GreaterGuiContent.GUIContent, m_GreaterGuiContent.Width);
+                    }
                 }
                 else
                 {
@@ -412,7 +452,7 @@ namespace UnityEasyGuiEditor
         {
             if (m_EntryNext != null)
             {
-                m_EntryCurrent = m_EntryNext;
+                CurrentEntry = m_EntryNext;
                 m_EntryNext = null;
                 m_ScrollPosition = Vector2.zero;
                 m_BreadcrumbScrollPosition = Vector2.zero;
@@ -424,12 +464,12 @@ namespace UnityEasyGuiEditor
 
                 if (string.IsNullOrEmpty(m_Filter))
                 {
-                    m_FilteredEntries = null;
+                    m_FilteredEntries = Array.Empty<Entry>();
                 }
                 else
                 {
                     var filteredEntries = new List<Entry>();
-                    m_EntryRoot.BuildFilteredList(filteredEntries, m_Filter.ToLower());
+                    m_EntryRoot?.BuildFilteredList(filteredEntries, m_Filter.ToLowerInvariant());
                     m_FilteredEntries = filteredEntries.ToArray();
                 }
             }
@@ -474,7 +514,7 @@ namespace UnityEasyGuiEditor
                     m_Resolution,
                     m_Resolution * aspect);
             }
-            
+
             var storedColor = GUI.color;
             GUI.color = m_Color;
 
@@ -483,6 +523,5 @@ namespace UnityEasyGuiEditor
 
             GUI.color = storedColor;
         }
-
     }
 }

@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using UnityEngine;
 
@@ -6,7 +8,7 @@ namespace UnityEasyGuiEditor
     [DisallowMultipleComponent]
     public class GuiCanvas : MonoBehaviour
     {
-        public static Action<Rect> OnGui;
+        public static Action<Rect>? OnGui;
 
         [SerializeField]
         private int m_Resolution = 360;
