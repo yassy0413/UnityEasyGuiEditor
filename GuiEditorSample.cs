@@ -41,7 +41,11 @@ namespace UnityEasyGuiEditor
 
         private void Update()
         {
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current.rightButton.wasPressedThisFrame)
+#else
             if (Input.GetMouseButtonDown(1))
+#endif
             {
                 if (GuiEditor.Instance != null)
                 {
@@ -67,6 +71,7 @@ namespace UnityEasyGuiEditor
                     {
                         Time.timeScale = v1;
                     }
+
                     GUILayout.Label(v0.ToString(CultureInfo.InvariantCulture));
                 }
                 {
@@ -80,6 +85,7 @@ namespace UnityEasyGuiEditor
                     {
                         QualitySettings.vSyncCount = v1;
                     }
+
                     GUILayout.Label(v0.ToString());
                 }
                 {
@@ -93,6 +99,7 @@ namespace UnityEasyGuiEditor
                     {
                         Application.targetFrameRate = v1;
                     }
+
                     GUILayout.Label(v0.ToString());
                 }
                 if (UnityEngine.Scripting.GarbageCollector.isIncremental)
@@ -104,9 +111,11 @@ namespace UnityEasyGuiEditor
                     var v0 = (int)(UnityEngine.Scripting.GarbageCollector.incrementalTimeSliceNanoseconds / 1000000);
                     var v1 = (int)GUILayout.HorizontalSlider(v0, 1, 1000, GUILayout.Height(SliderHeight));
                     if (v0 != v1)
-                    {//1000000 nano => 1 milli
+                    {
+                        //1000000 nano => 1 milli
                         UnityEngine.Scripting.GarbageCollector.incrementalTimeSliceNanoseconds = (ulong)(v1 * 1000000);
                     }
+
                     GUILayout.Label(v0.ToString());
                 }
             });
@@ -135,6 +144,9 @@ namespace UnityEasyGuiEditor
                 GUILayout.Label($"screen dpi: {Screen.dpi}");
                 GUILayout.Label($"screen width: {Screen.width}");
                 GUILayout.Label($"screen height: {Screen.height}");
+                GUILayout.Label($"current resolution width: {Screen.currentResolution.width}");
+                GUILayout.Label($"current resolution height: {Screen.currentResolution.height}");
+                GUILayout.Label($"current resolution refresh rate ratio: {Screen.currentResolution.refreshRateRatio}");
                 GUILayout.Label($"deviceOrientation: {Input.deviceOrientation}");
                 GUILayout.Label($"location: {Input.location.status}");
                 GUILayout.Label($"acceleration: {Input.acceleration}");
@@ -177,17 +189,16 @@ namespace UnityEasyGuiEditor
 
                 GUILayout.Label(string.Format("Reserved  {0:F1}MiB", Profiler.GetTotalReservedMemoryLong() / MiB));
                 GUILayout.Label(string.Format("Allocated {0:F1}MiB", Profiler.GetTotalAllocatedMemoryLong() / MiB));
-                GUILayout.Label(string.Format("Unused    {0:F1}MiB", Profiler.GetTotalUnusedReservedMemoryLong() / MiB));
-                GUILayout.Label(string.Format("Graphics  {0:F1}MiB", Profiler.GetAllocatedMemoryForGraphicsDriver() / MiB));
+                GUILayout.Label(string.Format("Unused    {0:F1}MiB",
+                    Profiler.GetTotalUnusedReservedMemoryLong() / MiB));
+                GUILayout.Label(string.Format("Graphics  {0:F1}MiB",
+                    Profiler.GetAllocatedMemoryForGraphicsDriver() / MiB));
                 GUILayout.Label(string.Format("Mono Used {0:F1}MiB", Profiler.GetMonoUsedSizeLong() / MiB));
                 GUILayout.Label(string.Format("Mono Heap {0:F1}MiB", Profiler.GetMonoHeapSizeLong() / MiB));
             });
 
             var entry = GuiEditor.Instance?.GetEntry("Sample/Test1/Test2/Test3/Test4/Test5");
-            entry?.Add("Test", static entry =>
-            {
-                GUILayout.Label(entry.Name);
-            });
+            entry?.Add("Test", static entry => { GUILayout.Label(entry.Name); });
         }
 
         private static void AddCanvasSample()
