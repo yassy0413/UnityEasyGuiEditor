@@ -18,6 +18,7 @@ namespace UnityEasyGuiEditor
     [DisallowMultipleComponent]
     public sealed class GuiEditorSample : MonoBehaviour
     {
+#if ENABLE_EASY_GUI_EDITOR_SAMPLE
         private const double MiB = 1024 * 1024;
 
         [SerializeField]
@@ -213,5 +214,6 @@ namespace UnityEasyGuiEditor
                 GUILayout.Label(DateTimeOffset.UtcNow.ToLocalTime().ToString());
             };
         }
+#endif // ENABLE_EASY_GUI_EDITOR_SAMPLE
     }
 }
