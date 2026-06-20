@@ -1,10 +1,11 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace UnityEasyGuiEditor
 {
@@ -14,6 +15,8 @@ namespace UnityEasyGuiEditor
         public static GuiEditor? Instance { get; private set; }
 
         private const int HeaderIconHeight = 24;
+
+        private static readonly int WindowId = typeof(GuiEditor).FullName!.GetHashCode();
 
         [SerializeField]
         private int m_Resolution = 360;
@@ -28,6 +31,9 @@ namespace UnityEasyGuiEditor
         private bool m_DontDestroyOnLoad;
 
         [SerializeField]
+        private bool m_VisibleOnAwake;
+
+        [SerializeField]
         private bool m_ApplySafeArea = true;
 
         [SerializeField]
@@ -40,10 +46,10 @@ namespace UnityEasyGuiEditor
         private Rect m_WindowRect = Rect.zero;
 
         [SerializeField]
-        private string m_RootName = "[]";
+        private Color m_WindowColor = new(0f, 0f, 0f, 0.8f);
 
         [SerializeField]
-        private Color m_Color = Color.white;
+        private string m_RootName = "[]";
 
         [SerializeField]
         private Texture2D? m_BackButtonTexture;
@@ -63,9 +69,13 @@ namespace UnityEasyGuiEditor
         private Vector2 m_BreadcrumbScrollPosition;
         private string m_Filter = string.Empty;
         private bool m_FilterUpdated;
+        private bool m_BlockMouseEvent;
+        private Canvas? m_EventBlockerCanvas;
+        private RectTransform? m_EventBlockerRectTransform;
         private Entry[] m_FilteredEntries = Array.Empty<Entry>();
         private GUI.WindowFunction m_WindowFunction = _ => { };
 
+        private GUIStyle? m_WindowStyle;
         private GUIContentWithSize? m_FilterGuiContent;
         private GUIContentWithSize? m_GreaterGuiContent;
         private GUIContentWithSize? m_BackGuiContent;
@@ -74,6 +84,12 @@ namespace UnityEasyGuiEditor
         private GUIContentWithSize? m_OpenGuiContent;
 
         public Entry? CurrentEntry { get; private set; }
+        public bool IsVisible { get; set; }
+
+        public void ToggleVisible()
+        {
+            IsVisible = !IsVisible;
+        }
 
         public sealed class Entry
         {
@@ -147,6 +163,7 @@ namespace UnityEasyGuiEditor
 
             m_EntryRoot = CreateRootEntry(m_RootName, null);
             CurrentEntry = m_EntryRoot;
+            IsVisible = m_VisibleOnAwake;
 
             m_WindowFunction = _ =>
             {
@@ -169,8 +186,20 @@ namespace UnityEasyGuiEditor
             Dispose();
         }
 
+        private void OnDisable()
+        {
+            SetEventBlockerActive(false);
+        }
+
         public void Dispose()
         {
+            if (m_EventBlockerCanvas != null)
+            {
+                Destroy(m_EventBlockerCanvas.gameObject);
+                m_EventBlockerCanvas = null;
+                m_EventBlockerRectTransform = null;
+            }
+
             m_EntryRoot = null;
             CurrentEntry = null;
             Instance = null;
@@ -477,6 +506,16 @@ namespace UnityEasyGuiEditor
 
         public void EnsureGuiContents()
         {
+            if (m_WindowStyle == null)
+            {
+                var tex = new Texture2D(1, 1);
+                tex.SetPixel(0, 0, m_WindowColor);
+                tex.Apply();
+
+                m_WindowStyle = new GUIStyle(GUI.skin.box);
+                m_WindowStyle.normal.background = tex;
+            }
+
             m_FilterGuiContent ??= new GUIContentWithSize("Filter:", GUI.skin.button);
             m_GreaterGuiContent ??= new GUIContentWithSize(">");
             m_BackGuiContent ??= new GUIContentWithSize("Back", GUI.skin.button);
@@ -487,21 +526,16 @@ namespace UnityEasyGuiEditor
 
         private void OnGUI()
         {
-            if (Event.current.type == EventType.MouseDrag)
+            if (!IsVisible)
             {
-                m_ScrollPosition -= Event.current.delta;
-                m_BreadcrumbScrollPosition.x -= Event.current.delta.x;
+                SetEventBlockerActive(false);
+                return;
             }
 
             EnsureGuiContents();
 
-            var rect = m_ApplySafeArea
-                ? Screen.safeArea
-                : new Rect(0, 0, Screen.width, Screen.height);
-
-            var scaleW = rect.width / m_Resolution;
-            var scaleH = rect.height / m_Resolution;
-            var scale = Mathf.Lerp(scaleW, scaleH, m_MatchHeight);
+            var rect = GetGuiArea();
+            var scale = GetGuiScale(rect);
             GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), Vector2.zero);
 
             if (m_WindowRect == Rect.zero)
@@ -515,13 +549,134 @@ namespace UnityEasyGuiEditor
                     m_Resolution * aspect);
             }
 
-            var storedColor = GUI.color;
-            GUI.color = m_Color;
+            var currentEvent = Event.current;
+            var eventType = currentEvent.type;
+            var mousePosition = currentEvent.mousePosition / scale;
+            var isMouseEvent = IsMouseEvent(currentEvent);
+            var isMouseEventInWindow = isMouseEvent && m_WindowRect.Contains(mousePosition);
+            var shouldBlockMouseEvent = isMouseEvent && (isMouseEventInWindow || m_BlockMouseEvent);
 
-            m_WindowRect = GUI.Window(
-                GetInstanceID(), m_WindowRect, m_WindowFunction, string.Empty, GUI.skin.box);
+            if (isMouseEventInWindow && eventType == EventType.MouseDown)
+            {
+                m_BlockMouseEvent = true;
+            }
 
-            GUI.color = storedColor;
+            if (shouldBlockMouseEvent && eventType == EventType.MouseDrag)
+            {
+                m_ScrollPosition -= currentEvent.delta / scale;
+                m_BreadcrumbScrollPosition.x -= currentEvent.delta.x / scale;
+            }
+
+            m_WindowRect = GUI.Window(WindowId, m_WindowRect, m_WindowFunction, string.Empty, m_WindowStyle);
+
+            UpdateEventBlocker(scale);
+
+            if (shouldBlockMouseEvent)
+            {
+                currentEvent.Use();
+            }
+
+            if (eventType == EventType.MouseUp)
+            {
+                m_BlockMouseEvent = false;
+            }
+        }
+
+        private static bool IsMouseEvent(Event e)
+        {
+            return e.type is EventType.MouseDown or EventType.MouseUp or EventType.MouseDrag or EventType.ScrollWheel;
+        }
+
+        private void UpdateEventBlocker(float scale)
+        {
+            EnsureEventBlocker();
+
+            if (m_EventBlockerCanvas == null || m_EventBlockerRectTransform == null)
+            {
+                return;
+            }
+
+            m_EventBlockerCanvas.gameObject.SetActive(IsVisible);
+
+            if (!IsVisible)
+            {
+                return;
+            }
+
+            var screenRect = new Rect(
+                m_WindowRect.x * scale,
+                m_WindowRect.y * scale,
+                m_WindowRect.width * scale,
+                m_WindowRect.height * scale);
+
+            m_EventBlockerRectTransform.anchoredPosition =
+                new Vector2(screenRect.xMin, Screen.height - screenRect.yMax);
+            m_EventBlockerRectTransform.sizeDelta = screenRect.size;
+        }
+
+        private void SetEventBlockerActive(bool active)
+        {
+            if (m_EventBlockerCanvas != null)
+            {
+                m_EventBlockerCanvas.gameObject.SetActive(active);
+            }
+        }
+
+        private void EnsureEventBlocker()
+        {
+            if (m_EventBlockerCanvas != null)
+            {
+                return;
+            }
+
+            var blocker = new GameObject(
+                $"{nameof(GuiEditor)}EventBlocker",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(GraphicRaycaster));
+            blocker.transform.SetParent(transform, false);
+
+            m_EventBlockerCanvas = blocker.GetComponent<Canvas>();
+            m_EventBlockerCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            m_EventBlockerCanvas.overrideSorting = true;
+            m_EventBlockerCanvas.sortingOrder = short.MaxValue;
+
+            var canvasRectTransform = blocker.GetComponent<RectTransform>();
+            canvasRectTransform.anchorMin = Vector2.zero;
+            canvasRectTransform.anchorMax = Vector2.one;
+            canvasRectTransform.offsetMin = Vector2.zero;
+            canvasRectTransform.offsetMax = Vector2.zero;
+
+            var imageObject = new GameObject(
+                "Blocker",
+                typeof(RectTransform),
+                typeof(Image));
+            imageObject.transform.SetParent(blocker.transform, false);
+
+            m_EventBlockerRectTransform = imageObject.GetComponent<RectTransform>();
+            m_EventBlockerRectTransform.anchorMin = Vector2.zero;
+            m_EventBlockerRectTransform.anchorMax = Vector2.zero;
+            m_EventBlockerRectTransform.pivot = Vector2.zero;
+
+            var image = imageObject.GetComponent<Image>();
+            image.color = Color.clear;
+            image.raycastTarget = true;
+
+            blocker.SetActive(false);
+        }
+
+        private Rect GetGuiArea()
+        {
+            return m_ApplySafeArea
+                ? Screen.safeArea
+                : new Rect(0, 0, Screen.width, Screen.height);
+        }
+
+        private float GetGuiScale(Rect rect)
+        {
+            var scaleW = rect.width / m_Resolution;
+            var scaleH = rect.height / m_Resolution;
+            return Mathf.Lerp(scaleW, scaleH, m_MatchHeight);
         }
     }
 }
