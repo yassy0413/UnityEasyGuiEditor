@@ -145,7 +145,7 @@ namespace UnityEasyGuiEditor
                 GUILayout.Label($"current resolution height: {Screen.currentResolution.height}");
                 GUILayout.Label($"current resolution refresh rate ratio: {Screen.currentResolution.refreshRateRatio}");
                 GUILayout.Label($"deviceOrientation: {Input.deviceOrientation}");
-                GUILayout.Label($"location: {Input.location.status}");
+                //GUILayout.Label($"location: {Input.location.status}");
                 GUILayout.Label($"acceleration: {Input.acceleration}");
                 GUILayout.Label($"supportsGyroscope: {SystemInfo.supportsGyroscope}");
 
