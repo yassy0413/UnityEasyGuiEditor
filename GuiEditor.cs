@@ -52,6 +52,15 @@ namespace UnityEasyGuiEditor
         private string m_RootName = "[]";
 
         [SerializeField]
+        private bool m_EnableRuntimeConsole = true;
+
+        [SerializeField]
+        private string m_RuntimeConsolePath = "System/Log";
+
+        [SerializeField]
+        private RuntimeConsole.Settings m_RuntimeConsoleSettings = new();
+
+        [SerializeField]
         private Texture2D? m_BackButtonTexture;
 
         [SerializeField]
@@ -64,6 +73,7 @@ namespace UnityEasyGuiEditor
         private Texture2D? m_FilterButtonTexture;
 
         private Entry? m_EntryRoot;
+        private RuntimeConsole? m_RuntimeConsole;
         private Entry? m_EntryNext;
         private Vector2 m_ScrollPosition;
         private Vector2 m_BreadcrumbScrollPosition;
@@ -85,6 +95,18 @@ namespace UnityEasyGuiEditor
 
         public Entry? CurrentEntry { get; private set; }
         public bool IsVisible { get; set; }
+
+        public int Resolution
+        {
+            get => m_Resolution;
+            set => m_Resolution = value;
+        }
+
+        public float MatchHeight
+        {
+            get => m_MatchHeight;
+            set => m_MatchHeight = value;
+        }
 
         public void ToggleVisible()
         {
@@ -179,6 +201,12 @@ namespace UnityEasyGuiEditor
             {
                 DontDestroyOnLoad(this);
             }
+
+            if (m_EnableRuntimeConsole)
+            {
+                m_RuntimeConsole = new RuntimeConsole(m_RuntimeConsoleSettings);
+                AddEntry(m_RuntimeConsolePath, m_RuntimeConsole.OnGUI);
+            }
         }
 
         private void OnDestroy()
@@ -193,6 +221,9 @@ namespace UnityEasyGuiEditor
 
         public void Dispose()
         {
+            m_RuntimeConsole?.Dispose();
+            m_RuntimeConsole = null;
+
             if (m_EventBlockerCanvas != null)
             {
                 Destroy(m_EventBlockerCanvas.gameObject);
