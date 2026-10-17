@@ -293,7 +293,7 @@ namespace UnityEasyGuiEditor
             }
 
             m_DetailStyle = new GUIStyle(GUI.skin.label) { fontSize = m_Settings.FontSize, wordWrap = true, richText = false };
-            m_FilterStyle = new GUIStyle(GUI.skin.button) { fontSize = m_Settings.FontSize + 1, clipping = TextClipping.Clip, richText = false };
+            m_FilterStyle = new GUIStyle(GUI.skin.button) { fontSize = m_Settings.FontSize + 1, clipping = TextClipping.Clip, wordWrap = false, richText = false };
             m_TextFilterStyle = new GUIStyle(GUI.skin.textField) { fontSize = m_Settings.FontSize + 1, richText = false };
         }
     }

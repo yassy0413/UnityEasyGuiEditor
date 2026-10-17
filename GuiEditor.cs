@@ -86,6 +86,7 @@ namespace UnityEasyGuiEditor
         private GUI.WindowFunction m_WindowFunction = _ => { };
 
         private GUIStyle? m_WindowStyle;
+        private GUISkin? m_EntrySkin;
         private GUIContentWithSize? m_FilterGuiContent;
         private GUIContentWithSize? m_GreaterGuiContent;
         private GUIContentWithSize? m_BackGuiContent;
@@ -224,6 +225,12 @@ namespace UnityEasyGuiEditor
             m_RuntimeConsole?.Dispose();
             m_RuntimeConsole = null;
 
+            if (m_EntrySkin != null)
+            {
+                Destroy(m_EntrySkin);
+                m_EntrySkin = null;
+            }
+
             if (m_EventBlockerCanvas != null)
             {
                 Destroy(m_EventBlockerCanvas.gameObject);
@@ -290,9 +297,7 @@ namespace UnityEasyGuiEditor
                     DrawBreadcrumb();
                 }
 
-                using var scrollViewScope = new GUILayout.ScrollViewScope(m_ScrollPosition);
-                m_ScrollPosition = scrollViewScope.scrollPosition;
-                onGui(entry);
+                DrawScrollView(() => onGui(entry));
             };
             return entry;
         }
@@ -313,19 +318,53 @@ namespace UnityEasyGuiEditor
             {
                 DrawSearch();
 
-                using var scrollViewScope = new GUILayout.ScrollViewScope(m_ScrollPosition);
-                m_ScrollPosition = scrollViewScope.scrollPosition;
-
-                if (m_FilteredEntries.Length < 1)
+                DrawScrollView(() =>
                 {
-                    DrawDirectory(entry);
-                }
-                else
-                {
-                    DrawFilteredEntries();
-                }
+                    if (m_FilteredEntries.Length < 1)
+                    {
+                        DrawDirectory(entry);
+                    }
+                    else
+                    {
+                        DrawFilteredEntries();
+                    }
+                });
             };
             return entry;
+        }
+
+        // Vertical scroll only. The content is kept to the window width, and long label / toggle / button text wraps
+        private void DrawScrollView(Action draw)
+        {
+            var verticalScrollbar = GUI.skin.verticalScrollbar;
+            using var scrollViewScope = new GUILayout.ScrollViewScope(m_ScrollPosition, false, false, GUIStyle.none, verticalScrollbar);
+            m_ScrollPosition = new Vector2(0f, scrollViewScope.scrollPosition.y);
+
+            var padding = m_WindowStyle?.padding.horizontal ?? 0;
+            var width = m_WindowRect.width - padding - verticalScrollbar.fixedWidth - verticalScrollbar.margin.horizontal;
+
+            // The layout is calculated after the window function returns, so the styles must keep wordWrap (a copy of the skin, not a temporary change)
+            if (m_EntrySkin == null)
+            {
+                m_EntrySkin = Instantiate(GUI.skin);
+                m_EntrySkin.label.wordWrap = true;
+                m_EntrySkin.toggle.wordWrap = true;
+                m_EntrySkin.button.wordWrap = true;
+            }
+
+            var skin = GUI.skin;
+            GUI.skin = m_EntrySkin;
+            try
+            {
+                using (new GUILayout.VerticalScope(GUILayout.Width(Mathf.Max(0f, width))))
+                {
+                    draw();
+                }
+            }
+            finally
+            {
+                GUI.skin = skin;
+            }
         }
 
         private static bool HeaderButton(GUIContentWithSize? content, Texture2D? texture2D)
