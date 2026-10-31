@@ -80,6 +80,7 @@ namespace UnityEasyGuiEditor
         private string m_Filter = string.Empty;
         private bool m_FilterUpdated;
         private bool m_BlockMouseEvent;
+        private bool m_IsVisible;
         private Canvas? m_EventBlockerCanvas;
         private RectTransform? m_EventBlockerRectTransform;
         private Entry[] m_FilteredEntries = Array.Empty<Entry>();
@@ -95,7 +96,19 @@ namespace UnityEasyGuiEditor
         private GUIContentWithSize? m_OpenGuiContent;
 
         public Entry? CurrentEntry { get; private set; }
-        public bool IsVisible { get; set; }
+        public bool IsVisible
+        {
+            get => m_IsVisible;
+            set
+            {
+                m_IsVisible = value;
+                if (!value)
+                {
+                    m_BlockMouseEvent = false;
+                    SetEventBlockerActive(false);
+                }
+            }
+        }
 
         public int Resolution
         {
@@ -217,6 +230,7 @@ namespace UnityEasyGuiEditor
 
         private void OnDisable()
         {
+            m_BlockMouseEvent = false;
             SetEventBlockerActive(false);
         }
 
@@ -666,9 +680,12 @@ namespace UnityEasyGuiEditor
                 return;
             }
 
-            m_EventBlockerCanvas.gameObject.SetActive(IsVisible);
+            // Closing the window can disable this component during GUI.Window.
+            // Do not reactivate the blocker after OnDisable has cleared it.
+            var shouldBlock = IsVisible && isActiveAndEnabled;
+            m_EventBlockerCanvas.gameObject.SetActive(shouldBlock);
 
-            if (!IsVisible)
+            if (!shouldBlock)
             {
                 return;
             }
