@@ -1,7 +1,7 @@
 {
     "name": "com.yassy.guieditor",
     "displayName": "Gui Editor",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "unity": "2020.1",
     "description": "Simplified gui editor for UnityEditor",
     "license": "GPL-3.0",

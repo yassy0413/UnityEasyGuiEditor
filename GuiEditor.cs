@@ -502,11 +502,11 @@ namespace UnityEasyGuiEditor
 
         private void ToggleOpenButton()
         {
-            if (enabled)
+            if (IsVisible && enabled)
             {
                 if (HeaderButton(m_CloseGuiContent, m_CloseButtonTexture))
                 {
-                    enabled = false;
+                    IsVisible = false;
                 }
             }
             else
@@ -516,6 +516,7 @@ namespace UnityEasyGuiEditor
                     if (GUILayout.Button(m_OpenGuiContent.GUIContent, m_OpenGuiContent.Width))
                     {
                         enabled = true;
+                        IsVisible = true;
                     }
                 }
             }
