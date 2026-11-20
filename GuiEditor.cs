@@ -86,6 +86,7 @@ namespace UnityEasyGuiEditor
         private Entry[] m_FilteredEntries = Array.Empty<Entry>();
         private GUI.WindowFunction m_WindowFunction = _ => { };
 
+        private Texture2D? m_WindowBackground;
         private GUIStyle? m_WindowStyle;
         private GUISkin? m_EntrySkin;
         private GUIContentWithSize? m_FilterGuiContent;
@@ -239,6 +240,13 @@ namespace UnityEasyGuiEditor
             m_RuntimeConsole?.Dispose();
             m_RuntimeConsole = null;
 
+            if (m_WindowBackground != null)
+            {
+                Destroy(m_WindowBackground);
+                m_WindowBackground = null;
+            }
+            m_WindowStyle = null;
+
             if (m_EntrySkin != null)
             {
                 Destroy(m_EntrySkin);
@@ -340,7 +348,7 @@ namespace UnityEasyGuiEditor
                     }
                     else
                     {
-                        DrawFilteredEntries();
+                        DrawEntryButtons(m_FilteredEntries);
                     }
                 });
             };
@@ -354,13 +362,11 @@ namespace UnityEasyGuiEditor
             using var scrollViewScope = new GUILayout.ScrollViewScope(m_ScrollPosition, false, false, GUIStyle.none, verticalScrollbar);
             m_ScrollPosition = new Vector2(0f, scrollViewScope.scrollPosition.y);
 
-            var padding = m_WindowStyle?.padding.horizontal ?? 0;
-            var width = m_WindowRect.width - padding - verticalScrollbar.fixedWidth - verticalScrollbar.margin.horizontal;
-
             // The layout is calculated after the window function returns, so the styles must keep wordWrap (a copy of the skin, not a temporary change)
             if (m_EntrySkin == null)
             {
                 m_EntrySkin = Instantiate(GUI.skin);
+                m_EntrySkin.hideFlags |= HideFlags.DontUnloadUnusedAsset;
                 m_EntrySkin.label.wordWrap = true;
                 m_EntrySkin.toggle.wordWrap = true;
                 m_EntrySkin.button.wordWrap = true;
@@ -370,7 +376,7 @@ namespace UnityEasyGuiEditor
             GUI.skin = m_EntrySkin;
             try
             {
-                using (new GUILayout.VerticalScope(GUILayout.Width(Mathf.Max(0f, width))))
+                using (new GUILayout.VerticalScope(GUILayout.Width(GetContentWidth(verticalScrollbar))))
                 {
                     draw();
                 }
@@ -394,54 +400,46 @@ namespace UnityEasyGuiEditor
                     GUILayout.Width(HeaderIconHeight), GUILayout.Height(HeaderIconHeight));
         }
 
-        private void DrawDirectory(Entry entry)
+        private float GetContentWidth(GUIStyle verticalScrollbar)
         {
-            var entryCount = entry.Entries.Count;
-
-            GUILayout.BeginHorizontal();
-
-            for (var index = 0; index < entryCount; ++index)
-            {
-                if (index % m_GroupSelectionXCount == 0)
-                {
-                    GUILayout.EndHorizontal();
-                    GUILayout.BeginHorizontal();
-                }
-
-                var childEntry = entry.Entries[index];
-
-                if (GUILayout.Button(childEntry.NameButtonGUIContent.GUIContent))
-                {
-                    m_EntryNext = childEntry;
-                }
-            }
-
-            GUILayout.EndHorizontal();
+            var padding = m_WindowStyle?.padding.horizontal ?? 0;
+            return Mathf.Max(0f, m_WindowRect.width - padding - verticalScrollbar.fixedWidth - verticalScrollbar.margin.horizontal);
         }
 
-        private void DrawFilteredEntries()
+        /// <summary>Draw equal-width buttons in the entry content area. Returns the clicked index or -1.</summary>
+        public int ChoiceRow<T>(IReadOnlyList<T> choices, int columns, Func<T, GUIContent> getContent)
         {
-            var entryCount = m_FilteredEntries.Length;
+            columns = Mathf.Max(1, columns);
+            var margin = GUI.skin.button.margin;
+            var spacing = Mathf.Max(margin.left, margin.right);
+            var availableWidth = GetContentWidth(GUI.skin.verticalScrollbar) - margin.horizontal;
+            var width = GUILayout.Width(Mathf.Max(0f, (availableWidth - spacing * (columns - 1f)) / columns));
+            var clicked = -1;
 
-            GUILayout.BeginHorizontal();
-
-            for (var index = 0; index < entryCount; ++index)
+            for (var index = 0; index < choices.Count;)
             {
-                if (index % m_GroupSelectionXCount == 0)
+                using var row = new GUILayout.HorizontalScope();
+                for (var column = 0; column < columns && index < choices.Count; column++, index++)
                 {
-                    GUILayout.EndHorizontal();
-                    GUILayout.BeginHorizontal();
-                }
-
-                var entry = m_FilteredEntries[index];
-
-                if (GUILayout.Button(entry.NameButtonGUIContent.GUIContent))
-                {
-                    m_EntryNext = entry;
+                    if (GUILayout.Button(getContent(choices[index]), width))
+                    {
+                        clicked = index;
+                    }
                 }
             }
 
-            GUILayout.EndHorizontal();
+            return clicked;
+        }
+
+        private void DrawDirectory(Entry entry) => DrawEntryButtons(entry.Entries);
+
+        private void DrawEntryButtons(IReadOnlyList<Entry> entries)
+        {
+            var clicked = ChoiceRow(entries, m_GroupSelectionXCount, entry => entry.NameButtonGUIContent.GUIContent);
+            if (clicked >= 0)
+            {
+                m_EntryNext = entries[clicked];
+            }
         }
 
         private void DrawSearch()
@@ -593,12 +591,12 @@ namespace UnityEasyGuiEditor
         {
             if (m_WindowStyle == null)
             {
-                var tex = new Texture2D(1, 1);
-                tex.SetPixel(0, 0, m_WindowColor);
-                tex.Apply();
+                m_WindowBackground = new Texture2D(1, 1) { hideFlags = HideFlags.DontUnloadUnusedAsset };
+                m_WindowBackground.SetPixel(0, 0, m_WindowColor);
+                m_WindowBackground.Apply();
 
                 m_WindowStyle = new GUIStyle(GUI.skin.box);
-                m_WindowStyle.normal.background = tex;
+                m_WindowStyle.normal.background = m_WindowBackground;
             }
 
             m_FilterGuiContent ??= new GUIContentWithSize("Filter:", GUI.skin.button);
